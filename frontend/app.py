@@ -11,7 +11,6 @@ from dash.dependencies import Output, Input, State
 from dash_html_components.Div import Div
 import dash_bootstrap_components as dbc
 from dash_bootstrap_components import Card, CardBody, CardHeader, Row, Col
-from waitress import serve
 
 from plot import plot_map, plot_forecast, plot_weather
 from const import FARMS, TZ

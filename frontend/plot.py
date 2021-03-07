@@ -2,14 +2,11 @@ from __future__ import annotations
 import os
 
 import pandas as pd
-import numpy as np
 import arrow
-import streamlit as st
 import plotly
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from pymongo import MongoClient
 from const import FARMS, TZ
 
 # define some common stylings
