@@ -2,14 +2,16 @@ import csv
 import os
 import urllib.request
 
-import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from const import FARMS
 
 # define some common stylings
-COLORS = px.colors.qualitative.Plotly
+COLORS = ['#636EFA', '#EF553B', '#00CC96',
+          '#AB63FA', '#FFA15A', '#19D3F3',
+          '#FF6692', '#B6E880', '#FF97FF',
+          '#FECB52']
 LIGHT_GREY = '#bebebe'
 MAPBOX_TOKEN = os.environ.get('MAPBOX_TOKEN')
 
@@ -86,8 +88,8 @@ def plot_forecast(time, pred, actual):
     # Plot the dashed line first, hide their legends, then plot solid lines and
     # show legends. Legneds are grouped so they can be hide/unhide at same time
     fig.add_trace(go.Scatter(
-        x = time[:latest+1],
-        y = [round(i, 2) for i in pred[:latest+1]],
+        x=time[:latest+1],
+        y=[round(i, 2) for i in pred[:latest+1]],
         name='Prediction (Forecast)',
         legendgroup='Forecast',
         showlegend=False,
@@ -95,14 +97,14 @@ def plot_forecast(time, pred, actual):
     ))
     fig.add_trace(go.Scatter(
         x=time,
-        y = [round(i, 2)  if i is not None else None for i in actual],
+        y=[round(i, 2) if i is not None else None for i in actual],
         name='Actual',
         legendgroup='Actual',
         line={'dash': 'solid', 'color': COLORS[0]}
     ))
     fig.add_trace(go.Scatter(
         x=time[latest:],
-        y=[round(i, 2)  if i is not None else None for i in pred[latest:]],
+        y=[round(i, 2) if i is not None else None for i in pred[latest:]],
         name='Prediction',
         legendgroup='Forecast',
         line={'dash': 'solid', 'color': COLORS[1]}
