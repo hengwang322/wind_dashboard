@@ -1,21 +1,15 @@
 import os
-import logging
 
-import pandas as pd
-from pymongo import MongoClient
 import arrow
-from dash import Dash, html, dcc
-from dash.dependencies import Output, Input, State
-from dash.html import Div
 import dash_bootstrap_components as dbc
-from dash_bootstrap_components import Card, CardBody, CardHeader, Row, Col
+from dash import Dash, dcc, html
+from dash.dependencies import Input, Output, State
+from dash.html import Div
+from dash_bootstrap_components import Card, CardBody, CardHeader, Col, Row
+from pymongo import MongoClient
 
-from plot import plot_map, plot_forecast, plot_weather
 from const import FARMS, TZ
-
-
-logging.basicConfig(level=logging.INFO)
-logging.getLogger('numexpr').setLevel(logging.WARNING)
+from plot import plot_forecast, plot_map, plot_weather
 
 app = Dash(__name__,
            meta_tags=[{'name': 'viewport',
@@ -26,8 +20,9 @@ app = Dash(__name__,
 app.title = 'Wind Dashboard'
 server = app.server
 
+MONGO_URI = os.environ.get('MONGO_URI')
 
-DB = MongoClient(os.environ.get('MONGO_URI'))['wpp']
+DB = MongoClient(MONGO_URI)['wpp']
 DEFAULT_FARM = list(FARMS.keys())[0]
 DEFAULT_DAY = 4 * 24
 FARM_OPTIONS = [{'label': v, 'value': k} for k, v in FARMS.items()]
@@ -36,6 +31,7 @@ RANGE_OPTIONS = [{'label': k, 'value': v} for k, v in
                   'Past 3 Months': ((2+90)*24), 'Past 6 Months': ((2+180)*24),
                   'Past Year': ((2+365)*24), 'All time': 0}.items()
                  ]
+TIME_FORMAT = 'YYYY-MM-DD HH:mm:SS'
 
 forecast_card = Card([
     CardHeader(id='plot-title', style={'height': '50px'}),
@@ -118,7 +114,7 @@ navbar = dbc.NavbarSimple(
             id='day-select',
             options=RANGE_OPTIONS,
             value=DEFAULT_DAY,
-            style={'width': 120, 'margin': 5}), align='start'
+            style={'width': 150, 'margin': 5}), align='start'
             ),
         Col(
             Div([
@@ -157,12 +153,18 @@ def update_forecast_plot(farm, day):
         farm = DEFAULT_FARM
     if not day:
         day = DEFAULT_DAY
-    df = pd.DataFrame(DB[farm].find(
-        {}, {'prediction': 1, 'actual': 1}).sort('_id', -1).limit(int(day)))
-    df['time'] = df._id.apply(lambda t: arrow.get(
-        t).to(TZ).format('YYYY-MM-DD HH:mm:SS'))
 
-    return plot_forecast(df, farm)
+    projections = {'prediction': 1, 'actual': 1}
+    conn = DB[farm].find({}, projections).sort('_id', -1).limit(int(day))
+    data = list(conn)
+
+    time = [d['_id'] for d in data]
+    time = [arrow.get(t).to(TZ).format(TIME_FORMAT) for t in time]
+    pred = [d['prediction'] for d in data]
+    actual = [d.get('actual') for d in data]
+    actual = [round(i, 2) if i is not None else None for i in actual]
+
+    return plot_forecast(time, pred, actual)
 
 
 @app.callback(
@@ -176,12 +178,20 @@ def update_weather_plot(farm, day):
     if not day:
         day = DEFAULT_DAY
 
-    df = pd.DataFrame(DB[farm].find({}, {'temperature': 1, 'wind_gust': 1,
-                                         'wind_speed': 1, 'actual': 1}).sort('_id', -1).limit(int(day)))
-    df['time'] = df._id.apply(lambda t: arrow.get(
-        t).to(TZ).format('YYYY-MM-DD HH:mm:SS'))
+    projections = {'temperature': 1, 'wind_gust': 1,
+                   'wind_speed': 1, 'actual': 1}
+    conn = DB[farm].find({}, projections).sort('_id', -1).limit(int(day))
+    data = list(conn)
 
-    return plot_weather(df, farm)
+    time = [d['_id'] for d in data]
+    time = [arrow.get(t).to(TZ).format(TIME_FORMAT) for t in time]
+    actual = [d.get('actual') for d in data]
+    actual = [round(i, 2) if i is not None else None for i in actual]
+    temperature = [d.get('temperature') for d in data]
+    wind_gust = [d.get('wind_gust') for d in data]
+    wind_speed = [d.get('wind_speed') for d in data]
+
+    return plot_weather(time, actual, temperature, wind_gust, wind_speed)
 
 
 @app.callback(
@@ -202,22 +212,22 @@ def update_plot_title(farm):
 def update_weather(farm):
     if not farm:
         farm = DEFAULT_FARM
+    filters = {"actual": {"$exists": "true"}}
+    projections = {'icon': 1,  'temperature': 1,
+                   'wind_gust': 1, 'wind_speed': 1}
 
-    df = pd.DataFrame(DB[farm].find({}, {'icon': 1,  'temperature': 1,
-                                         'wind_gust': 1, 'wind_speed': 1, 'actual': 1}).sort('_id', -1).limit(3*24))
-    df['time'] = df._id.apply(lambda t: arrow.get(
-        t).to(TZ).format('YYYY-MM-DD HH:mm:SS'))
+    conn = DB[farm].find(filters, projections).sort('_id', -1).limit(1)
+    data = list(conn)[0]
 
-    latest = df[df.actual.isna()].index[-1]+1
+    icon = data.get('icon')
+    temp = data['temperature']
+    wind = data['wind_speed']
+    gust = data['wind_gust']
 
-    icon = df.loc[latest, 'icon']
     if not icon:
         icon = 'default'
 
     url = f'https://raw.githubusercontent.com/hengwang322/wind_web_app/master/resources/{icon}.gif'
-    temp = df.loc[latest, 'temperature']
-    wind = df.loc[latest, 'wind_speed']
-    gust = df.loc[latest, 'wind_gust']
 
     weather = [
         html.H5(f'Current Weather:'),
