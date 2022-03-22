@@ -54,9 +54,15 @@ def plot_map():
         marker=go.scattermapbox.Marker(
             size=[i / 3 + 3 for i in power],
             color=power,
-            colorbar={'title': 'Power (MW)'},
-            colorscale='Viridis'
-        ),
+            colorscale='Viridis',
+            colorbar=dict(
+                title='Power (MW)',
+                x=0.01,
+                y=0.99,
+                yanchor='top',
+                len=0.3,
+                bgcolor='white'
+            )),
         hovertext=[f'{s}: {p} (MW)' for s, p in zip(names, power)],
     ))
 
@@ -64,13 +70,6 @@ def plot_map():
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(l=10, r=10, t=10, b=10),
-        coloraxis=dict(
-            colorbar_x=0.01,
-            colorbar_y=0.99,
-            colorbar_yanchor='top',
-            colorbar_len=0.3,
-            colorbar_bgcolor='white'
-        ),
         mapbox=dict(
             accesstoken=MAPBOX_TOKEN,
             center={'lat': -35.5, 'lon': 137.5},
