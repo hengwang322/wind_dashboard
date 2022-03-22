@@ -4,11 +4,9 @@ import logging
 import pandas as pd
 from pymongo import MongoClient
 import arrow
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import Dash, html, dcc
 from dash.dependencies import Output, Input, State
-from dash_html_components.Div import Div
+from dash.html import Div
 import dash_bootstrap_components as dbc
 from dash_bootstrap_components import Card, CardBody, CardHeader, Row, Col
 
@@ -19,11 +17,11 @@ from const import FARMS, TZ
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('numexpr').setLevel(logging.WARNING)
 
-app = dash.Dash(__name__,
-                meta_tags=[{'name': 'viewport',
-                            'content': 'width=device-width'}],
-                external_stylesheets=[dbc.themes.FLATLY]
-                )
+app = Dash(__name__,
+           meta_tags=[{'name': 'viewport',
+                       'content': 'width=device-width'}],
+           external_stylesheets=[dbc.themes.FLATLY]
+           )
 
 app.title = 'Wind Dashboard'
 server = app.server
@@ -47,20 +45,18 @@ forecast_card = Card([
             config={'displayModeBar': False},
             style={'height': '250px'}
         )
-    )], style={'margin': 5, 'height': '320px'}
-    , className='card border-success')
+    )], style={'margin': 5, 'height': '320px'}, className='card border-success')
 
 weather_card = Card(CardBody(
     [dcc.Graph(
         id='weather-plot',
         config={'displayModeBar': False},
         style={'height': '200px'}
-    )]), style={'margin': 5, 'height': '250px'}
-    , className='card border-primary')
+    )]), style={'margin': 5, 'height': '250px'}, className='card border-primary')
 
 weather_info = Card(
-    CardBody(id='weather'), 
-    style={'margin': 5, 'height': '250px'}, 
+    CardBody(id='weather'),
+    style={'margin': 5, 'height': '250px'},
     className='card border-primary')
 
 map_card = Card(
@@ -129,9 +125,9 @@ navbar = dbc.NavbarSimple(
                 dbc.Button('About', id='open', style={'margin': 5}),
                 about_modal
             ]), align='start')
-    ], no_gutters=True, justify='center'),
+    ], justify='center'),
     brand='Welcome to Wind Power Prediction Dashboard!',
-    brand_style={'color':'white'},
+    brand_style={'color': 'white'},
     color='success',
     sticky='top',
 )
@@ -143,10 +139,10 @@ app.layout = Div([
         Col([
             forecast_card,
             Row([Col(weather_info, lg=4),
-                 Col(weather_card, lg=8)], no_gutters=True)
+                 Col(weather_card, lg=8)])
         ], lg=8, align='start'),
         Col(map_card, lg=4, align='start')
-    ], no_gutters=True,
+    ],
         style={'width': '90%', 'margin': 'auto'})
 ])
 
