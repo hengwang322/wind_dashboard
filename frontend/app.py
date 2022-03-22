@@ -16,12 +16,9 @@ app = Dash(__name__,
                        'content': 'width=device-width'}],
            external_stylesheets=[dbc.themes.FLATLY]
            )
-
 app.title = 'Wind Dashboard'
-server = app.server
 
 MONGO_URI = os.environ.get('MONGO_URI')
-
 DB = MongoClient(MONGO_URI)['wpp']
 DEFAULT_FARM = list(FARMS.keys())[0]
 DEFAULT_DAY = 4 * 24
@@ -249,6 +246,7 @@ def toggle_modal(n1, n2, is_open):
         return not is_open
     return is_open
 
+dapp = app.server.wsgi_app
 
 if __name__ == '__main__':
     app.run_server(debug=True)
