@@ -1,35 +1,25 @@
 import os
-import logging
 
-import pandas as pd
-from pymongo import MongoClient
 import arrow
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
-from dash.dependencies import Output, Input, State
-from dash_html_components.Div import Div
 import dash_bootstrap_components as dbc
-from dash_bootstrap_components import Card, CardBody, CardHeader, Row, Col
+from dash import Dash, dcc, html
+from dash.dependencies import Input, Output, State
+from dash.html import Div
+from dash_bootstrap_components import Card, CardBody, CardHeader, Col, Row
+from pymongo import MongoClient
 
-from plot import plot_map, plot_forecast, plot_weather
 from const import FARMS, TZ
+from plot import plot_forecast, plot_map, plot_weather
 
-
-logging.basicConfig(level=logging.INFO)
-logging.getLogger('numexpr').setLevel(logging.WARNING)
-
-app = dash.Dash(__name__,
-                meta_tags=[{'name': 'viewport',
-                            'content': 'width=device-width'}],
-                external_stylesheets=[dbc.themes.FLATLY]
-                )
-
+app = Dash(__name__,
+           meta_tags=[{'name': 'viewport',
+                       'content': 'width=device-width'}],
+           external_stylesheets=[dbc.themes.FLATLY]
+           )
 app.title = 'Wind Dashboard'
-server = app.server
 
-
-DB = MongoClient(os.environ.get('MONGO_URI'))['wpp']
+MONGO_URI = os.environ.get('MONGO_URI')
+DB = MongoClient(MONGO_URI)['wpp']
 DEFAULT_FARM = list(FARMS.keys())[0]
 DEFAULT_DAY = 4 * 24
 FARM_OPTIONS = [{'label': v, 'value': k} for k, v in FARMS.items()]
@@ -38,6 +28,7 @@ RANGE_OPTIONS = [{'label': k, 'value': v} for k, v in
                   'Past 3 Months': ((2+90)*24), 'Past 6 Months': ((2+180)*24),
                   'Past Year': ((2+365)*24), 'All time': 0}.items()
                  ]
+TIME_FORMAT = 'YYYY-MM-DD HH:mm:SS'
 
 forecast_card = Card([
     CardHeader(id='plot-title', style={'height': '50px'}),
@@ -47,20 +38,18 @@ forecast_card = Card([
             config={'displayModeBar': False},
             style={'height': '250px'}
         )
-    )], style={'margin': 5, 'height': '320px'}
-    , className='card border-success')
+    )], style={'margin': 5, 'height': '320px'}, className='card border-success')
 
 weather_card = Card(CardBody(
     [dcc.Graph(
         id='weather-plot',
         config={'displayModeBar': False},
         style={'height': '200px'}
-    )]), style={'margin': 5, 'height': '250px'}
-    , className='card border-primary')
+    )]), style={'margin': 5, 'height': '250px'}, className='card border-primary')
 
 weather_info = Card(
-    CardBody(id='weather'), 
-    style={'margin': 5, 'height': '250px'}, 
+    CardBody(id='weather'),
+    style={'margin': 5, 'height': '250px'},
     className='card border-primary')
 
 map_card = Card(
@@ -122,16 +111,16 @@ navbar = dbc.NavbarSimple(
             id='day-select',
             options=RANGE_OPTIONS,
             value=DEFAULT_DAY,
-            style={'width': 120, 'margin': 5}), align='start'
+            style={'width': 150, 'margin': 5}), align='start'
             ),
         Col(
             Div([
                 dbc.Button('About', id='open', style={'margin': 5}),
                 about_modal
             ]), align='start')
-    ], no_gutters=True, justify='center'),
+    ], justify='center'),
     brand='Welcome to Wind Power Prediction Dashboard!',
-    brand_style={'color':'white'},
+    brand_style={'color': 'white'},
     color='success',
     sticky='top',
 )
@@ -143,10 +132,10 @@ app.layout = Div([
         Col([
             forecast_card,
             Row([Col(weather_info, lg=4),
-                 Col(weather_card, lg=8)], no_gutters=True)
+                 Col(weather_card, lg=8)])
         ], lg=8, align='start'),
         Col(map_card, lg=4, align='start')
-    ], no_gutters=True,
+    ],
         style={'width': '90%', 'margin': 'auto'})
 ])
 
@@ -161,12 +150,18 @@ def update_forecast_plot(farm, day):
         farm = DEFAULT_FARM
     if not day:
         day = DEFAULT_DAY
-    df = pd.DataFrame(DB[farm].find(
-        {}, {'prediction': 1, 'actual': 1}).sort('_id', -1).limit(int(day)))
-    df['time'] = df._id.apply(lambda t: arrow.get(
-        t).to(TZ).format('YYYY-MM-DD HH:mm:SS'))
 
-    return plot_forecast(df, farm)
+    projections = {'prediction': 1, 'actual': 1}
+    conn = DB[farm].find({}, projections).sort('_id', -1).limit(int(day))
+    data = list(conn)
+
+    time = [d['_id'] for d in data]
+    time = [arrow.get(t).to(TZ).format(TIME_FORMAT) for t in time]
+    pred = [d['prediction'] for d in data]
+    actual = [d.get('actual') for d in data]
+    actual = [round(i, 2) if i is not None else None for i in actual]
+
+    return plot_forecast(time, pred, actual)
 
 
 @app.callback(
@@ -180,12 +175,20 @@ def update_weather_plot(farm, day):
     if not day:
         day = DEFAULT_DAY
 
-    df = pd.DataFrame(DB[farm].find({}, {'temperature': 1, 'wind_gust': 1,
-                                         'wind_speed': 1, 'actual': 1}).sort('_id', -1).limit(int(day)))
-    df['time'] = df._id.apply(lambda t: arrow.get(
-        t).to(TZ).format('YYYY-MM-DD HH:mm:SS'))
+    projections = {'temperature': 1, 'wind_gust': 1,
+                   'wind_speed': 1, 'actual': 1}
+    conn = DB[farm].find({}, projections).sort('_id', -1).limit(int(day))
+    data = list(conn)
 
-    return plot_weather(df, farm)
+    time = [d['_id'] for d in data]
+    time = [arrow.get(t).to(TZ).format(TIME_FORMAT) for t in time]
+    actual = [d.get('actual') for d in data]
+    actual = [round(i, 2) if i is not None else None for i in actual]
+    temperature = [d.get('temperature') for d in data]
+    wind_gust = [d.get('wind_gust') for d in data]
+    wind_speed = [d.get('wind_speed') for d in data]
+
+    return plot_weather(time, actual, temperature, wind_gust, wind_speed)
 
 
 @app.callback(
@@ -206,22 +209,22 @@ def update_plot_title(farm):
 def update_weather(farm):
     if not farm:
         farm = DEFAULT_FARM
+    filters = {"actual": {"$exists": "true"}}
+    projections = {'icon': 1,  'temperature': 1,
+                   'wind_gust': 1, 'wind_speed': 1}
 
-    df = pd.DataFrame(DB[farm].find({}, {'icon': 1,  'temperature': 1,
-                                         'wind_gust': 1, 'wind_speed': 1, 'actual': 1}).sort('_id', -1).limit(3*24))
-    df['time'] = df._id.apply(lambda t: arrow.get(
-        t).to(TZ).format('YYYY-MM-DD HH:mm:SS'))
+    conn = DB[farm].find(filters, projections).sort('_id', -1).limit(1)
+    data = list(conn)[0]
 
-    latest = df[df.actual.isna()].index[-1]+1
+    icon = data.get('icon')
+    temp = data['temperature']
+    wind = data['wind_speed']
+    gust = data['wind_gust']
 
-    icon = df.loc[latest, 'icon']
     if not icon:
         icon = 'default'
 
     url = f'https://raw.githubusercontent.com/hengwang322/wind_web_app/master/resources/{icon}.gif'
-    temp = df.loc[latest, 'temperature']
-    wind = df.loc[latest, 'wind_speed']
-    gust = df.loc[latest, 'wind_gust']
 
     weather = [
         html.H5(f'Current Weather:'),
@@ -243,6 +246,7 @@ def toggle_modal(n1, n2, is_open):
         return not is_open
     return is_open
 
+dapp = app.server.wsgi_app
 
 if __name__ == '__main__':
     app.run_server(debug=True)

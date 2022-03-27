@@ -1,0 +1,18 @@
+{
+    "dev": {
+        "app_function": "app.dapp",
+        "aws_region": "ap-southeast-2",
+        "profile_name": "default",
+        "project_name": "wind_dashboard",
+        "runtime": "python3.9",
+        "environment_variables": {"DASH_REQUESTS_PATHNAME_PREFIX": "/dev/"}
+    },
+    "prod": {
+        "app_function": "app.dapp",
+        "aws_region": "ap-southeast-2",
+        "profile_name": "default",
+        "project_name": "wind_dashboard",
+        "runtime": "python3.9",
+        "environment_variables": {"DASH_REQUESTS_PATHNAME_PREFIX": "/prod/"}
+    }
+}
