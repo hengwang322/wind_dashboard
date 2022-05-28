@@ -1,6 +1,5 @@
 import os
 import pickle
-from pathlib import Path
 import time
 
 import numpy as np
@@ -13,7 +12,7 @@ pd.options.mode.chained_assignment = None
 MONGO_URI = os.environ['MONGO_URI']
 
 
-def main():
+def update_pred():
     time_start = time.time()
     client = connect_db(MONGO_URI)
     models = pickle.load(open(MODEL_FILE, 'rb'))
@@ -24,13 +23,9 @@ def main():
         X, _ = transform_data(df)
         model = models[farm]
 
-        update_df = df[['time', 'prediction']]
-        update_df['prediction'] = model.predict(X)
-        # convert the columns to type float64 so mongodb can take them
-        update_df.prediction = update_df.prediction.apply(float)
-        # rectify negative values
-        bad_index = update_df[update_df.prediction < 0].index
-        update_df.loc[bad_index, 'prediction'] = 0
+        update_df = df[['time', 'prediction']].copy()
+        update_df['prediction'] = np.clip(
+            model.predict(X), a_min=0.0, a_max=None)
         update_db(farm, update_df, upsert=True)
 
     m, s = divmod(time.time()-time_start, 60)
@@ -40,4 +35,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    update_pred()

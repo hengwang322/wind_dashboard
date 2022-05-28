@@ -1,10 +1,10 @@
 import os
 import pickle
-from pathlib import Path
 import time
 
 import arrow
 import pandas as pd
+import numpy as np
 
 from models import MODEL_FILE, transform_data
 from data import FARM_LIST, update_db, get_weather, get_power
@@ -13,7 +13,7 @@ pd.options.mode.chained_assignment = None
 MONGO_URI = os.environ['MONGO_URI']
 
 
-def main():
+def update_data():
     time_start = time.time()
     models = pickle.load(open(MODEL_FILE, 'rb'))
     tz = 'Australia/Sydney'
@@ -27,16 +27,8 @@ def main():
         weather_update = get_weather(farm, yesterday, dayafter)
         X, _ = transform_data(weather_update)
         model = models[farm]
-        weather_update['prediction'] = model.predict(X)
-
-        # rectify negative values
-        bad_index = weather_update[weather_update.prediction < 0].index
-        weather_update.loc[bad_index, 'prediction'] = 0
-        # convert the columns to type float64 so mongodb can take them
-        for col in ['cloud_cover', 'dew_point', 'humidity', 'ozone',
-                    'precipitation', 'pressure', 'temperature', 'uv_index',
-                    'visibility', 'wind_bearing', 'wind_gust', 'wind_speed', 'prediction']:
-            weather_update[col] = weather_update[col].apply(float)
+        weather_update['prediction'] = np.clip(
+            model.predict(X), a_min=0.0, a_max=None)
         update_db(farm, weather_update, upsert=True)
 
         power_update = get_power(farm, yesterday, today)
@@ -49,4 +41,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    update_data()
