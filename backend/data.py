@@ -52,6 +52,9 @@ def fetch_data(client, farm, limit):
 
 def update_db(farm, update_df, upsert=True):
     """Update database via bulk write."""
+    if len(update_df) == 0:
+        print('No update found')
+        return
     if 'time' in update_df.columns:
         update_df = update_df.rename(columns={'time': '_id'})
     client = connect_db(MONGO_URI)
