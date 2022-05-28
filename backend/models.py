@@ -8,8 +8,6 @@ from random import randint
 import numpy as np
 import pandas as pd
 from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
-from sklearn.metrics import mean_squared_error as mse
-from sklearn.model_selection import train_test_split
 from xgboost import XGBRegressor
 
 from data import fetch_data, connect_db
@@ -29,14 +27,25 @@ space = {'max_depth': hp.quniform('max_depth', 3, 15, 1),
          }
 
 
-def split_data(X, y, seed, test_size=0.1, val_size=0.1):
-    """Split data to train, validation, test sets."""
-    X_train_, X_test, y_train_, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=seed)
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_, y_train_, test_size=val_size, random_state=seed)
+def mse(y_true, y_pred, squared=True):
+    output_errors = np.average((y_true - y_pred) ** 2, axis=0)
+    if not squared:
+        output_errors = np.sqrt(output_errors)
+    return np.average(output_errors)
 
-    return X_train, X_val, X_test, y_train, y_val, y_test
+
+def split_data(X, y, seed, test_size=0.1, val_size=0.1):
+    indexes = X.index.values.copy()
+    rng = np.random.default_rng(seed)
+    rng.shuffle(indexes)
+
+    n_train = int(len(X) * (1 - test_size - val_size))
+    n_val = int(len(X) * val_size)
+    train = indexes[:n_train]
+    val = indexes[n_train: n_train+n_val]
+    test = indexes[n_train+n_val:]
+
+    return X.loc[train, :], X.loc[val, :], X.loc[test, :], y.loc[train], y.loc[val], y.loc[test]
 
 
 def transform_data(original_df):
@@ -98,12 +107,12 @@ def optimize_model(farm, max_evals, timeout):
                              reg_alpha=int(space['reg_alpha']),
                              min_child_weight=space['min_child_weight'],
                              colsample_bytree=space['colsample_bytree'],
+                             eval_metric='rmse',
+                             early_stopping_rounds=5,
                              random_state=seed)
 
         model.fit(X_train, y_train,
                   eval_set=[(X_train, y_train), (X_val, y_val)],
-                  eval_metric='rmse',
-                  early_stopping_rounds=5,
                   verbose=False)
 
         pred = model.predict(X_val)
@@ -134,16 +143,16 @@ def optimize_model(farm, max_evals, timeout):
         if write_header:
             writer.writerow(header)
         to_write = map(str, [
-                            uuid.uuid4(), 
-                            int(time.time()), 
-                            farm, 
-                            runtime, 
-                            trial_no,
-                            dt_range, 
-                            best, 
-                            mse(model.predict(X_test), y_test, squared=False), 
-                            seed,
-                            ])
+            uuid.uuid4(),
+            int(time.time()),
+            farm,
+            runtime,
+            trial_no,
+            dt_range,
+            best,
+            mse(model.predict(X_test), y_test, squared=False),
+            seed,
+        ])
         writer.writerow(to_write)
 
     return model
