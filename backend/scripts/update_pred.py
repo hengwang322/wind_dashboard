@@ -1,5 +1,5 @@
 import os
-import pickle
+from compress_pickle import load
 import time
 
 import numpy as np
@@ -15,7 +15,7 @@ MONGO_URI = os.environ['MONGO_URI']
 def update_pred():
     time_start = time.time()
     client = connect_db(MONGO_URI)
-    models = pickle.load(open(MODEL_FILE, 'rb'))
+    models = load(open(MODEL_FILE, 'rb'))
 
     for farm in FARM_LIST:
         print(f'Updating {farm}         ', end='\r', flush=True)

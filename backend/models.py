@@ -2,7 +2,7 @@ import csv
 import os
 import time
 import uuid
-import pickle
+from compress_pickle import dump as dump_pickle
 from random import randint
 
 import numpy as np
@@ -12,7 +12,7 @@ from xgboost import XGBRegressor
 
 from data import fetch_data, connect_db
 
-MODEL_FILE = os.path.join('models', 'models.pkl')
+MODEL_FILE = os.path.join('models', 'models.pkl.gz')
 TRAIN_LOG_FILE = os.path.join('models', 'train.log')
 MONGO_URI = os.environ.get('MONGO_URI')
 
@@ -168,7 +168,7 @@ def train_models(train_list, max_evals=50, timeout=300, dump=True):
 
     if dump:
         print('Dumping file...', end='', flush=True)
-        pickle.dump(models, open(MODEL_FILE, 'wb'))
+        dump_pickle(models, open(MODEL_FILE, 'wb'))
         print(' Done!')
 
     return models

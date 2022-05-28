@@ -1,5 +1,5 @@
 import os
-import pickle
+from compress_pickle import load
 import time
 
 import arrow
@@ -15,7 +15,7 @@ MONGO_URI = os.environ['MONGO_URI']
 
 def update_data():
     time_start = time.time()
-    models = pickle.load(open(MODEL_FILE, 'rb'))
+    models = load(open(MODEL_FILE, 'rb'))
     tz = 'Australia/Sydney'
     dt_format = 'YYYY-MM-DD HH:00:00'  # round to hour
     today = arrow.utcnow().to(tz).format(dt_format)
